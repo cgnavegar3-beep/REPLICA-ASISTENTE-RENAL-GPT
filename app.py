@@ -52,39 +52,32 @@ for key in ["soip_o", "soip_i", "ic_inter", "ic_clinica", "reg_id", "reg_centro"
     if key not in st.session_state: st.session_state[key] = ""
 
 # --- CONFIGURACIÓN IA ---
-try:
-    API_KEY = st.secrets["OPENAI_API_KEY"]
-except:
-    API_KEY = None
-    st.sidebar.error("API Key no encontrada.")
+API_KEY = os.environ.get("OPENAI_API_KEY")  # también puedes usar st.secrets si usas Streamlit Cloud
+if API_KEY:
+    client = OpenAI(api_key=API_KEY)
+else:
+    client = None
+    st.sidebar.error("API Key no configurada.")
 
 # --- FUNCIONES ---
 def llamar_ia_en_cascada(prompt):
-    if not API_KEY: 
+    if not client: 
         return "⚠️ Error: API Key no configurada."
 
-    # Lista de modelos OpenAI a probar en orden
-    modelos = [
-        "gpt-3.5-turbo", 
-        "gpt-3.5-turbo-16k", 
-        "gpt-3.5-turbo-0613"
-    ]
-
-    for mod in modelos:
+    # Lista de modelos para fallback en cascada
+    modelos = ["gpt-4-32k", "gpt-4", "gpt-3.5-turbo", "gpt-3.5-turbo-16k"]
+    for modelo in modelos:
         try:
-            st.session_state.active_model = mod.upper()
-            client = OpenAI(api_key=API_KEY)
-            resp = client.chat.completions.create(
-                model=mod,
-                messages=[{"role":"user","content":prompt}],
-                temperature=0.1,
+            st.session_state.active_model = modelo.upper()
+            respuesta = client.chat.completions.create(
+                model=modelo,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1
             )
-            return resp.choices[0].message.content
+            return respuesta.choices[0].message.content
         except Exception as e:
-            # Si falla este modelo, continúa con el siguiente
-            continue
-
-    return "⚠️ Error en la generación de contenido: todos los modelos fallaron."
+            continue  # si falla, prueba el siguiente modelo
+    return "⚠️ Error en la generación."
 
 def obtener_glow_class(sintesis_texto):
     if "⛔" in sintesis_texto: return "glow-red"
@@ -205,4 +198,4 @@ with tabs[0]:
     if btn_val:
         faltan_datos = not all([st.session_state.reg_centro, st.session_state.reg_res, calc_e, calc_p, calc_c, calc_s])
         if faltan_datos:
-            st.markdown('<div class="blink-text">⚠️ AVISO: FALTAN DATOS EN REGISTRO O CALCULADORA. EL ANÁLISIS PUEDE SER
+            st.markdown('<div class="blink-text">⚠️ AVISO: FALTAN DATOS EN REGISTRO O CALCULADORA. EL ANÁLISIS PUEDE SER INCOMPLETO.</div
