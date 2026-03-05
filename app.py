@@ -54,25 +54,37 @@ for key in ["soip_o", "soip_i", "ic_inter", "ic_clinica", "reg_id", "reg_centro"
 # --- CONFIGURACIÓN IA ---
 try:
     API_KEY = st.secrets["OPENAI_API_KEY"]
-    client = OpenAI(api_key=API_KEY)  # Se usa OpenAI en lugar de genai
 except:
     API_KEY = None
     st.sidebar.error("API Key no encontrada.")
 
 # --- FUNCIONES ---
 def llamar_ia_en_cascada(prompt):
-    if not API_KEY:
+    if not API_KEY: 
         return "⚠️ Error: API Key no configurada."
-    try:
-        st.session_state.active_model = "GPT-4"
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"⚠️ Error en la generación: {e}"
+
+    # Lista de modelos OpenAI a probar en orden
+    modelos = [
+        "gpt-3.5-turbo", 
+        "gpt-3.5-turbo-16k", 
+        "gpt-3.5-turbo-0613"
+    ]
+
+    for mod in modelos:
+        try:
+            st.session_state.active_model = mod.upper()
+            client = OpenAI(api_key=API_KEY)
+            resp = client.chat.completions.create(
+                model=mod,
+                messages=[{"role":"user","content":prompt}],
+                temperature=0.1,
+            )
+            return resp.choices[0].message.content
+        except Exception as e:
+            # Si falla este modelo, continúa con el siguiente
+            continue
+
+    return "⚠️ Error en la generación de contenido: todos los modelos fallaron."
 
 def obtener_glow_class(sintesis_texto):
     if "⛔" in sintesis_texto: return "glow-red"
@@ -193,48 +205,4 @@ with tabs[0]:
     if btn_val:
         faltan_datos = not all([st.session_state.reg_centro, st.session_state.reg_res, calc_e, calc_p, calc_c, calc_s])
         if faltan_datos:
-            st.markdown('<div class="blink-text">⚠️ AVISO: FALTAN DATOS EN REGISTRO O CALCULADORA. EL ANÁLISIS PUEDE SER INCOMPLETO.</div>', unsafe_allow_html=True)
-        
-        if not st.session_state.main_meds:
-            st.error("Introduce medicamentos.")
-        else:
-            with st.spinner("Analizando..."):
-                prompt_final = f"{c.PROMPT_AFR_V10}\n\nFG C-G: {valor_fg}\nFG CKD: {val_ckd}\nFG MDRD: {val_mdrd}\n\nMEDS:\n{st.session_state.main_meds}"
-                resp_raw = llamar_ia_en_cascada(prompt_final)
-                resp = resp_raw[resp_raw.find("|||"):] if "|||" in resp_raw else resp_raw
-                try:
-                    partes = [p.strip() for p in resp.split("|||") if p.strip()]
-                    while len(partes) < 3: partes.append("")
-                    sintesis, tabla, detalle = partes[:3]
-                    glow = obtener_glow_class(sintesis)
-                    st.markdown(f'<div class="synthesis-box {glow}">{sintesis.replace("\n","<br>")}</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="table-container">{tabla}</div>', unsafe_allow_html=True)
-                    st.markdown(f'''<div class="clinical-detail-container">{detalle.replace("\n","<br>")}<div class="nota-importante-box"><div style="font-weight: 800; margin-bottom: 8px;">⚠️ NOTA IMPORTANTE:</div><div class="nota-item">1. Verifique siempre con la ficha técnica oficial (AEMPS/EMA).</div><div class="nota-item">2. Los ajustes propuestos son orientativos según filtrado glomerular actual.</div><div class="nota-item">3. La decisión final corresponde siempre al prescriptor médico.</div><div class="nota-item">4. Considere la situación clínica global del paciente antes de modificar dosis.</div></div></div>''', unsafe_allow_html=True)
-                    
-                    datos_obj_lista = []
-                    if calc_e: datos_obj_lista.append(f"Edad: {calc_e}a")
-                    if calc_p: datos_obj_lista.append(f"Peso: {calc_p}kg")
-                    if calc_c: datos_obj_lista.append(f"Crea: {calc_c}mg/dL")
-                    if valor_fg: datos_obj_lista.append(f"FG: {valor_fg}mL/min")
-                    
-                    sintesis_limpia = sintesis.replace("BLOQUE 1: ALERTAS Y AJUSTES", "").strip()
-                    detalle_limpio = detalle.split("⚠️ NOTA IMPORTANTE:")[0].replace("BLOQUE 3: ANALISIS CLINICO", "").strip()
-                    
-                    st.session_state.soip_o = " | ".join(datos_obj_lista)
-                    st.session_state.soip_i = sintesis_limpia
-                    st.session_state.ic_inter = f"Se solicita revisión de los siguientes fármacos:\n{sintesis_limpia}"
-                    st.session_state.ic_clinica = f"{st.session_state.soip_o}\n\n{detalle_limpio}"
-                except Exception as e: st.error(f"Error: {e}")
-
-with tabs[1]:
-    for label, key, h in [("Subjetivo (S)", "soip_s", 70), ("Objetivo (O)", "soip_o", 70), ("Interpretación (I)", "soip_i", 120), ("Plan (P)", "soip_p", 100)]:
-        st.markdown(f'<div class="linea-discreta-soip">{label}</div>', unsafe_allow_html=True)
-        st.text_area(key, st.session_state[key], height=h, label_visibility="collapsed", placeholder=f"Contenido de {label}...")
-    
-    st.markdown('<div class="linea-discreta-soip">INTERCONSULTA</div>', unsafe_allow_html=True)
-    st.text_area("IC_B1", st.session_state.ic_inter, height=150, label_visibility="collapsed", placeholder="Se solicita revisión...")
-    
-    st.markdown('<div class="linea-discreta-soip">INFORMACIÓN CLÍNICA</div>', unsafe_allow_html=True)
-    st.text_area("IC_B2", st.session_state.ic_clinica, height=250, label_visibility="collapsed", placeholder="Datos objetivos y análisis clínico...")
-
-st.markdown(f"""<div class="warning-yellow">⚠️ <b>Esta herramienta es de apoyo a la revisión farmacoterapéutica. Verifique siempre con fuentes oficiales.</b></div> <div style="text-align:right; font-size:0.6rem; color:#ccc; font-family:monospace; margin-top:10px;">v. 05 mar 2026 12:48</div>""", unsafe_allow_html=True)
+            st.markdown('<div class="blink-text">⚠️ AVISO: FALTAN DATOS EN REGISTRO O CALCULADORA. EL ANÁLISIS PUEDE SER
