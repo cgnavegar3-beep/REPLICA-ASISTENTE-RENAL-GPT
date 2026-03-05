@@ -54,24 +54,25 @@ for key in ["soip_o", "soip_i", "ic_inter", "ic_clinica", "reg_id", "reg_centro"
 # --- CONFIGURACIÓN IA ---
 try:
     API_KEY = st.secrets["OPENAI_API_KEY"]
-    genai.configure(api_key=API_KEY)
+    client = OpenAI(api_key=API_KEY)  # Se usa OpenAI en lugar de genai
 except:
     API_KEY = None
     st.sidebar.error("API Key no encontrada.")
 
 # --- FUNCIONES ---
 def llamar_ia_en_cascada(prompt):
-    if not API_KEY: return "⚠️ Error: API Key no configurada."
-    disponibles = [m.name.replace('models/', '').replace('gemini-', '') for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-    orden = ['2.5-flash', 'flash-latest', '1.5-pro']
-    for mod_name in orden:
-        if mod_name in disponibles:
-            try:
-                st.session_state.active_model = mod_name.upper()
-                model = genai.GenerativeModel(f'models/gemini-{mod_name}')
-                return model.generate_content(prompt, generation_config={"temperature": 0.1}).text
-            except: continue
-    return "⚠️ Error en la generación."
+    if not API_KEY:
+        return "⚠️ Error: API Key no configurada."
+    try:
+        st.session_state.active_model = "GPT-4"
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"⚠️ Error en la generación: {e}"
 
 def obtener_glow_class(sintesis_texto):
     if "⛔" in sintesis_texto: return "glow-red"
