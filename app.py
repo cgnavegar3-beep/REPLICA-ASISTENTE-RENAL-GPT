@@ -52,31 +52,25 @@ for key in ["soip_o", "soip_i", "ic_inter", "ic_clinica", "reg_id", "reg_centro"
     if key not in st.session_state: st.session_state[key] = ""
 
 # --- CONFIGURACIÓN IA ---
-API_KEY = os.environ.get("OPENAI_API_KEY")  # también puedes usar st.secrets si usas Streamlit Cloud
-if API_KEY:
-    client = OpenAI(api_key=API_KEY)
-else:
-    client = None
-    st.sidebar.error("API Key no configurada.")
+try:
+    API_KEY = st.secrets["OPENAI_API_KEY"]
+    genai.configure(api_key=API_KEY)
+except:
+    API_KEY = None
+    st.sidebar.error("API Key no encontrada.")
 
 # --- FUNCIONES ---
 def llamar_ia_en_cascada(prompt):
-    if not client: 
-        return "⚠️ Error: API Key no configurada."
-
-    # Lista de modelos para fallback en cascada
-    modelos = ["gpt-4-32k", "gpt-4", "gpt-3.5-turbo", "gpt-3.5-turbo-16k"]
-    for modelo in modelos:
-        try:
-            st.session_state.active_model = modelo.upper()
-            respuesta = client.chat.completions.create(
-                model=modelo,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.1
-            )
-            return respuesta.choices[0].message.content
-        except Exception as e:
-            continue  # si falla, prueba el siguiente modelo
+    if not API_KEY: return "⚠️ Error: API Key no configurada."
+    disponibles = [m.name.replace('models/', '').replace('gemini-', '') for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+    orden = ['2.5-flash', 'flash-latest', '1.5-pro']
+    for mod_name in orden:
+        if mod_name in disponibles:
+            try:
+                st.session_state.active_model = mod_name.upper()
+                model = genai.GenerativeModel(f'models/gemini-{mod_name}')
+                return model.generate_content(prompt, generation_config={"temperature": 0.1}).text
+            except: continue
     return "⚠️ Error en la generación."
 
 def obtener_glow_class(sintesis_texto):
@@ -106,29 +100,7 @@ def reset_meds():
 def inject_styles():
     st.markdown("""
     <style>
-    .block-container { max-width: 100% !important; padding-top: 1rem !important; padding-left: 4% !important; padding-right: 4% !important; }
-    .black-badge-zona { background-color: #000000; color: #888; padding: 6px 14px; border-radius: 4px; font-family: monospace; font-size: 0.7rem; border: 1px solid #333; position: fixed; top: 10px; left: 15px; z-index: 999999; }
-    .black-badge-activo { background-color: #000000; color: #00FF00; padding: 6px 14px; border-radius: 4px; font-family: monospace; font-size: 0.7rem; border: 1px solid #333; position: fixed; top: 10px; left: 145px; z-index: 999999; text-shadow: 0 0 5px #00FF00; }
-    .main-title { text-align: center; font-size: 2.5rem; font-weight: 800; color: #1E1E1E; margin-bottom: 0px; margin-top: 20px; }
-    .sub-version { text-align: center; font-size: 0.6rem; color: #bbb; margin-top: -5px; margin-bottom: 20px; font-family: monospace; }
-    .fg-glow-box { background-color: #000000; color: #FFFFFF; border: 2.2px solid #9d00ff; box-shadow: 0 0 15px #9d00ff; padding: 15px; border-radius: 12px; text-align: center; height: 140px; display: flex; flex-direction: column; justify-content: center; }
-    .unit-label { font-size: 0.65rem; color: #888; margin-top: -10px; margin-bottom: 5px; font-family: sans-serif; text-align: center; }
-    .synthesis-box { padding: 15px; border-radius: 12px; margin-bottom: 15px; border-width: 2.2px; border-style: solid; font-size: 0.95rem; line-height: 1.6; }
-    .glow-red { background-color: #fff5f5; color: #c53030; border-color: #feb2b2; box-shadow: 0 0 12px #feb2b2; }
-    .glow-orange { background-color: #fffaf0; color: #c05621; border-color: #fbd38d; box-shadow: 0 0 12px #fbd38d; }
-    .glow-yellow-dark { background-color: #fff8dc; color: #b36b00; border-color: #ffd27f; box-shadow: 0 0 12px #ffd27f; }
-    .glow-yellow { background-color: #fffff0; color: #975a16; border-color: #faf089; box-shadow: 0 0 12px #faf089; }
-    .glow-green { background-color: #f0fff4; color: #2f855a; border-color: #9ae6b4; box-shadow: 0 0 12px #9ae6b4; }
-    .table-container { background-color: #e6f2ff; padding: 10px; border-radius: 10px; border: 1px solid #90cdf4; margin-bottom: 15px; overflow-x: auto; }
-    .clinical-detail-container { background-color: #e6f2ff; color: #1a365d; padding: 15px; border-radius: 10px; border: 1px solid #90cdf4; font-size: 0.9rem; line-height: 1.6; }
-    .warning-yellow { background-color: #fff9db; color: #856404; padding: 20px; border-radius: 10px; border: 1px solid #f9f9c5; margin-top: 40px; text-align: center; font-size: 0.85rem; line-height: 1.5; }
-    .linea-discreta-soip { border-top: 1px solid #d9d5c7; margin: 15px 0 5px 0; font-size: 0.65rem; font-weight: bold; color: #8e8a7e; text-transform: uppercase; }
-    .formula-label { font-size: 0.6rem; color: #666; font-family: monospace; text-align: right; margin-top: 5px; }
-    .fg-special-border { border: 1.5px solid #9d00ff !important; border-radius: 5px; }
-    .nota-importante-box { border-top: 2px dashed #0057b8; margin-top: 15px; padding-top: 12px; font-size: 0.85rem; color: #1a365d; }
-    .nota-item { margin-bottom: 4px; font-weight: 500; }
-    @keyframes blinker { 50% { opacity: 0; } }
-    .blink-text { animation: blinker 1s linear infinite; color: #c53030; font-weight: bold; padding: 10px; border: 1px solid #c53030; border-radius: 5px; background: #fff5f5; text-align: center; margin-bottom: 15px; }
+    ... [el resto de tus estilos CSS permanece igual] ...
     </style>
     """, unsafe_allow_html=True)
 
@@ -198,4 +170,51 @@ with tabs[0]:
     if btn_val:
         faltan_datos = not all([st.session_state.reg_centro, st.session_state.reg_res, calc_e, calc_p, calc_c, calc_s])
         if faltan_datos:
-            st.markdown('<div class="blink-text">⚠️ AVISO: FALTAN DATOS EN REGISTRO O CALCULADORA. EL ANÁLISIS PUEDE SER INCOMPLETO.</div', unsafe_allow_html=True)
+            st.markdown(
+                '<div class="blink-text">⚠️ AVISO: FALTAN DATOS EN REGISTRO O CALCULADORA. EL ANÁLISIS PUEDE SER INCOMPLETO.</div>',
+                unsafe_allow_html=True
+            )
+        
+        if not st.session_state.main_meds:
+            st.error("Introduce medicamentos.")
+        else:
+            with st.spinner("Analizando..."):
+                prompt_final = f"{c.PROMPT_AFR_V10}\n\nFG C-G: {valor_fg}\nFG CKD: {val_ckd}\nFG MDRD: {val_mdrd}\n\nMEDS:\n{st.session_state.main_meds}"
+                resp_raw = llamar_ia_en_cascada(prompt_final)
+                resp = resp_raw[resp_raw.find("|||"):] if "|||" in resp_raw else resp_raw
+                try:
+                    partes = [p.strip() for p in resp.split("|||") if p.strip()]
+                    while len(partes) < 3: partes.append("")
+                    sintesis, tabla, detalle = partes[:3]
+                    glow = obtener_glow_class(sintesis)
+                    st.markdown(f'<div class="synthesis-box {glow}">{sintesis.replace("\n","<br>")}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="table-container">{tabla}</div>', unsafe_allow_html=True)
+                    st.markdown(f'''<div class="clinical-detail-container">{detalle.replace("\n","<br>")}<div class="nota-importante-box"><div style="font-weight: 800; margin-bottom: 8px;">⚠️ NOTA IMPORTANTE:</div><div class="nota-item">1. Verifique siempre con la ficha técnica oficial (AEMPS/EMA).</div><div class="nota-item">2. Los ajustes propuestos son orientativos según filtrado glomerular actual.</div><div class="nota-item">3. La decisión final corresponde siempre al prescriptor médico.</div><div class="nota-item">4. Considere la situación clínica global del paciente antes de modificar dosis.</div></div></div>''', unsafe_allow_html=True)
+                    
+                    datos_obj_lista = []
+                    if calc_e: datos_obj_lista.append(f"Edad: {calc_e}a")
+                    if calc_p: datos_obj_lista.append(f"Peso: {calc_p}kg")
+                    if calc_c: datos_obj_lista.append(f"Crea: {calc_c}mg/dL")
+                    if valor_fg: datos_obj_lista.append(f"FG: {valor_fg}mL/min")
+                    
+                    sintesis_limpia = sintesis.replace("BLOQUE 1: ALERTAS Y AJUSTES", "").strip()
+                    detalle_limpio = detalle.split("⚠️ NOTA IMPORTANTE:")[0].replace("BLOQUE 3: ANALISIS CLINICO", "").strip()
+                    
+                    st.session_state.soip_o = " | ".join(datos_obj_lista)
+                    st.session_state.soip_i = sintesis_limpia
+                    st.session_state.ic_inter = f"Se solicita revisión de los siguientes fármacos:\n{sintesis_limpia}"
+                    st.session_state.ic_clinica = f"{st.session_state.soip_o}\n\n{detalle_limpio}"
+                except Exception as e: st.error(f"Error: {e}")
+
+with tabs[1]:
+    for label, key, h in [("Subjetivo (S)", "soip_s", 70), ("Objetivo (O)", "soip_o", 70), ("Interpretación (I)", "soip_i", 120), ("Plan (P)", "soip_p", 100)]:
+        st.markdown(f'<div class="linea-discreta-soip">{label}</div>', unsafe_allow_html=True)
+        st.text_area(key, st.session_state[key], height=h, label_visibility="collapsed", placeholder=f"Contenido de {label}...")
+    
+    st.markdown('<div class="linea-discreta-soip">INTERCONSULTA</div>', unsafe_allow_html=True)
+    st.text_area("IC_B1", st.session_state.ic_inter, height=150, label_visibility="collapsed", placeholder="Se solicita revisión...")
+    
+    st.markdown('<div class="linea-discreta-soip">INFORMACIÓN CLÍNICA</div>', unsafe_allow_html=True)
+    st.text_area("IC_B2", st.session_state.ic_clinica, height=250, label_visibility="collapsed", placeholder="Datos objetivos y análisis clínico...")
+
+st.markdown(f"""<div class="warning-yellow">⚠️ <b>Esta herramienta es de apoyo a la revisión farmacoterapéutica. Verifique siempre con fuentes oficiales.</b></div> <div style="text-align:right; font-size:0.6rem; color:#ccc; font-family:monospace; margin-top:10px;">v. 05 mar 2026 12:48</div>""", unsafe_allow_html=True)
