@@ -53,7 +53,7 @@ for key in ["soip_o", "soip_i", "ic_inter", "ic_clinica", "reg_id", "reg_centro"
 
 # --- CONFIGURACIÓN IA ---
 try:
-    API_KEY = st.secrets["GEMINI_API_KEY"]
+    API_KEY = st.secrets["OPENAI_API_KEY"]
     genai.configure(api_key=API_KEY)
 except:
     API_KEY = None
