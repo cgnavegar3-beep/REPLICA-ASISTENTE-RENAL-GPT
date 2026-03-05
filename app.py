@@ -54,7 +54,6 @@ for key in ["soip_o", "soip_i", "ic_inter", "ic_clinica", "reg_id", "reg_centro"
 # --- CONFIGURACIÓN IA ---
 try:
     API_KEY = st.secrets["OPENAI_API_KEY"]
-    client = OpenAI(api_key=API_KEY)
 except:
     API_KEY = None
     st.sidebar.error("API Key no encontrada.")
@@ -63,19 +62,19 @@ except:
 def llamar_ia_en_cascada(prompt):
     if not API_KEY: return "⚠️ Error: API Key no configurada."
     
-    modelos_disponibles = ["gpt-4", "gpt-4-32k", "gpt-3.5-turbo", "gpt-3.5-turbo-16k"]
-    for model_name in modelos_disponibles:
+    modelos = ["gpt-4", "gpt-3.5-turbo", "text-davinci-003", "text-davinci-002"]
+    for m in modelos:
         try:
-            st.session_state.active_model = model_name.upper()
+            client = OpenAI(api_key=API_KEY)
             response = client.chat.completions.create(
-                model=model_name,
-                messages=[{"role": "user", "content": prompt}],
+                model=m,
+                messages=[{"role":"user","content":prompt}],
                 temperature=0.1
             )
             return response.choices[0].message.content
-        except Exception as e:
+        except Exception:
             continue
-    return "⚠️ Error en la generación con todos los modelos."
+    return "⚠️ Error en la generación: ningún modelo disponible."
 
 def obtener_glow_class(sintesis_texto):
     if "⛔" in sintesis_texto: return "glow-red"
@@ -137,10 +136,8 @@ st.markdown(f'<div class="black-badge-activo">ACTIVO: {st.session_state.active_m
 st.markdown('<div class="main-title">ASISTENTE RENAL</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-version">v. 05 mar 2026 12:48</div>', unsafe_allow_html=True)
 
-# --- TABS ---
 tabs = st.tabs(["💊 VALIDACIÓN", "📄 INFORME", "📊 DATOS", "📈 GRÁFICOS"])
 
-# ============================= TAB VALIDACIÓN =============================
 with tabs[0]:
     st.markdown("### Registro de Paciente")
     c1, c2, c3, c4, c5 = st.columns([1, 1, 1, 1.5, 0.4])
@@ -158,7 +155,6 @@ with tabs[0]:
     with c4: st.text_input("ID Registro", key="reg_id", disabled=True)
     with c5: st.write(""); st.button("🗑️", on_click=reset_registro, key="btn_reset_reg")
 
-# ============================= Calculadora y FG =============================
     col_izq, col_der = st.columns(2, gap="large")
     with col_izq:
         st.markdown("#### 📋 Calculadora")
@@ -185,7 +181,6 @@ with tabs[0]:
             val_ckd = st.number_input("CKD-EPI", value=None, placeholder="CKD-EPI", label_visibility="collapsed", key="fgl_ckd")
             st.markdown('</div><div class="unit-label">mL/min/1,73m²</div>', unsafe_allow_html=True)
 
-# ============================= Listado de medicamentos =============================
     st.write(""); st.markdown("---")
     m_col1, m_col2 = st.columns([0.5, 0.5])
     with m_col1: st.markdown("#### 📝 Listado de medicamentos")
@@ -197,6 +192,17 @@ with tabs[0]:
     btn_val = b1.button("🚀 VALIDAR ADECUACIÓN", use_container_width=True)
     b2.button("🗑️ RESET", on_click=reset_meds, use_container_width=True)
 
-# ============================= Validación =============================
     if btn_val:
-        faltan_datos = not all([st.session_state.reg_centro, st.session_state.reg_res, calc_e, calc_p, calc_c,
+        faltan_datos = not all([
+            st.session_state.reg_centro, 
+            st.session_state.reg_res, 
+            calc_e, 
+            calc_p, 
+            calc_c, 
+            calc_s
+        ])
+        if faltan_datos:
+            st.markdown('<div class="blink-text">⚠️ AVISO: FALTAN DATOS EN REGISTRO O CALCULADORA. EL ANÁLISIS PUEDE SER INCOMPLETO.</div>', unsafe_allow_html=True)
+
+        if not st.session_state.main_meds:
+            st.error("Introduce medicamentos
