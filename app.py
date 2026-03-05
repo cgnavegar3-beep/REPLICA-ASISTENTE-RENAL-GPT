@@ -205,4 +205,4 @@ with tabs[0]:
             st.markdown('<div class="blink-text">⚠️ AVISO: FALTAN DATOS EN REGISTRO O CALCULADORA. EL ANÁLISIS PUEDE SER INCOMPLETO.</div>', unsafe_allow_html=True)
 
         if not st.session_state.main_meds:
-            st.error("Introduce medicamentos
+            st.error("Introduce medicamentos")
