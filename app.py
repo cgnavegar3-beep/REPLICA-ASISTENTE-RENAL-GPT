@@ -1,5 +1,3 @@
-|||python
-
 # v. 05 mar 2026 12:48 (CONTROL DE INTEGRIDAD INTERNO: 188 LÍNEAS)
 
 import streamlit as st
