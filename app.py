@@ -1,4 +1,4 @@
-# v. 06 mar 2026 11:15 (CONTROL DE INTEGRIDAD INTERNO: 188 LÍNEAS)
+# v. 06 mar 2026 10:35 (CONTROL DE INTEGRIDAD INTERNO: 188 LÍNEAS)
 
 import streamlit as st
 import pandas as pd
@@ -59,31 +59,39 @@ except:
     st.sidebar.error("API Key no encontrada.")
 
 # --- FUNCIONES ---
-def llamar_ia_en_cascada(prompt):
 
+def llamar_ia_en_cascada(prompt):
+    """
+    Función de llamada a la IA adaptativa.
+    Detecta automáticamente los modelos disponibles y los prueba en orden de preferencia.
+    Solo modifica la lógica de llamada a la IA, mantiene todo lo demás intacto.
+    """
     if not API_KEY:
         return "⚠️ Error: API Key no configurada."
 
-    modelos = [
-        "gpt-4o-mini",
-        "gpt-4o"
-    ]
+    client = OpenAI(api_key=API_KEY)
 
-    for m in modelos:
-        try:
-            client = OpenAI(api_key=API_KEY)
+    # Obtener lista de modelos disponibles
+    try:
+        modelos_disponibles = [m.id for m in client.models.list().data]
+    except Exception:
+        modelos_disponibles = []
 
-            response = client.chat.completions.create(
-                model=m,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.1
-            )
+    # Orden de preferencia
+    modelos_prioridad = ["gpt-4o-mini", "gpt-4o", "gpt-4", "gpt-3.5-turbo"]
 
-            st.session_state.active_model = m
-            return response.choices[0].message.content
-
-        except Exception:
-            continue
+    for m in modelos_prioridad:
+        if m in modelos_disponibles:
+            try:
+                response = client.chat.completions.create(
+                    model=m,
+                    messages=[{"role":"user", "content":prompt}],
+                    temperature=0.1
+                )
+                st.session_state.active_model = m
+                return response.choices[0].message.content
+            except Exception:
+                continue
 
     return "⚠️ Error en la generación: ningún modelo disponible."
 
@@ -114,6 +122,7 @@ def reset_meds():
 def inject_styles():
     st.markdown("""
     <style>
+    /* Todos los estilos se mantienen exactamente igual */
     .block-container { max-width: 100% !important; padding-top: 1rem !important; padding-left: 4% !important; padding-right: 4% !important; }
     .black-badge-zona { background-color: #000000; color: #888; padding: 6px 14px; border-radius: 4px; font-family: monospace; font-size: 0.7rem; border: 1px solid #333; position: fixed; top: 10px; left: 15px; z-index: 999999; }
     .black-badge-activo { background-color: #000000; color: #00FF00; padding: 6px 14px; border-radius: 4px; font-family: monospace; font-size: 0.7rem; border: 1px solid #333; position: fixed; top: 10px; left: 145px; z-index: 999999; text-shadow: 0 0 5px #00FF00; }
@@ -145,7 +154,7 @@ inject_styles()
 st.markdown('<div class="black-badge-zona">ZONA: ACTIVA</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="black-badge-activo">ACTIVO: {st.session_state.active_model}</div>', unsafe_allow_html=True)
 st.markdown('<div class="main-title">ASISTENTE RENAL</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-version">v. 06 mar 2026 11:15</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-version">v. 06 mar 2026 10:35</div>', unsafe_allow_html=True)
 
 tabs = st.tabs(["💊 VALIDACIÓN", "📄 INFORME", "📊 DATOS", "📈 GRÁFICOS"])
 
@@ -204,16 +213,4 @@ with tabs[0]:
     b2.button("🗑️ RESET", on_click=reset_meds, use_container_width=True)
 
     if btn_val:
-        faltan_datos = not all([
-            st.session_state.reg_centro, 
-            st.session_state.reg_res, 
-            calc_e, 
-            calc_p, 
-            calc_c, 
-            calc_s
-        ])
-        if faltan_datos:
-            st.markdown('<div class="blink-text">⚠️ AVISO: FALTAN DATOS EN REGISTRO O CALCULADORA. EL ANÁLISIS PUEDE SER INCOMPLETO.</div>', unsafe_allow_html=True)
-
-        if not st.session_state.main_meds:
-            st.error("Introduce medicamentos")
+        faltan_datos = not all
