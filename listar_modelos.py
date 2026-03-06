@@ -1,14 +1,19 @@
 from openai import OpenAI
+import os
 
-# Sustituye con tu clave real de OpenAI
-API_KEY = "TU_API_KEY_AQUI"
+# Asegúrate de tener tu API Key en la variable de entorno OPENAI_API_KEY
+API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Conectamos con OpenAI
+if not API_KEY:
+    print("⚠️ No se ha encontrado la API Key en la variable de entorno.")
+    exit(1)
+
 client = OpenAI(api_key=API_KEY)
 
-# Listamos todos los modelos disponibles
-modelos = client.models.list()
-
-print("=== Modelos disponibles ===")
-for m in modelos.data:
-    print(m.id)
+try:
+    modelos = client.models.list()
+    print("=== Modelos disponibles ===")
+    for modelo in modelos.data:
+        print(modelo.id)
+except Exception as e:
+    print("Error al listar modelos:", e)
